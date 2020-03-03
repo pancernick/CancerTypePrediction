@@ -1,25 +1,20 @@
 '''
 This code is written by Milad Mostavi, one of authors of
-"Convolutional neural network models for cancer type prediction based on gene expression" paper.
+    "Convolutional neural network models
+    for cancer type prediction based on gene expression" paper.
 Please cite this paper in the case it was useful in your research
 '''
 import pickle
-from numpy import array
-from numpy import argmax
+import numpy as np
+
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
-import numpy as np
 from sklearn.model_selection import train_test_split
-import collections
-import matplotlib.pyplot as plt
-import pandas as pd
-from keras.models import Sequential, Model
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Activation, Flatten, Input
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers.normalization import BatchNormalization
-from keras.layers.advanced_activations import LeakyReLU
-from sklearn.metrics import precision_recall_curve, roc_curve, auc, average_precision_score
 from sklearn.model_selection import StratifiedKFold
+
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Dense, Activation, Flatten
+from keras.callbacks import EarlyStopping
 
 
 A = open('TCGA_new_pre_second.pckl', 'rb')
@@ -32,7 +27,7 @@ f = open('TCGA_new_pre_first.pckl', 'rb')
 f.close()
 
 
-## embedding labels
+# embedding labels
 # integer encode
 label_encoder = LabelEncoder()
 integer_encoded = label_encoder.fit_transform(project_ids_new)
@@ -41,19 +36,19 @@ onehot_encoder = OneHotEncoder(sparse=False)
 integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
 onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
-X_cancer_samples =dropped_genes_final.iloc[:,remain_cancer_ids_ind].T.values
-X_normal_samples = dropped_genes_final.iloc[:,remain_normal_ids_ind].T.values
+X_cancer_samples = dropped_genes_final.iloc[:, remain_cancer_ids_ind].T.values
+X_normal_samples = dropped_genes_final.iloc[:, remain_normal_ids_ind].T.values
 onehot_encoded_cancer_samples = onehot_encoded[remain_cancer_ids_ind]
 onehot_encoded_normal_samples = onehot_encoded[remain_normal_ids_ind]
 
 X_cancer_samples_mat = np.concatenate((X_cancer_samples,np.zeros((len(X_cancer_samples),9))),axis=1)
-## add nine zeros to the end of each sample
+# add nine zeros to the end of each sample
 X_cancer_samples_mat = np.reshape(X_cancer_samples_mat, (-1, 71, 100))
 
-## This line is useful when only one fold training is needed
-x_train, x_test, y_train, y_test = train_test_split(X_cancer_samples_mat, onehot_encoded_cancer_samples,
-                                                    stratify= onehot_encoded_cancer_samples,
-                                                    test_size=0.25, random_state=42)
+# This line is useful when only one fold training is needed
+x_train, x_test, y_train, y_test = train_test_split(
+    X_cancer_samples_mat, onehot_encoded_cancer_samples,
+    stratify= onehot_encoded_cancer_samples,test_size=0.25, random_state=42)
 
 
 img_rows, img_cols = len(x_test[0]), len(x_test[0][0])
