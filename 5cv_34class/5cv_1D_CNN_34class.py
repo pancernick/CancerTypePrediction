@@ -3,64 +3,53 @@ This code is written by Milad Mostavi, one of authors of
 "Convolutional neural network models for cancer type prediction based on gene expression" paper.
 Please cite this paper in the case it was useful in your research
 '''
+import sys
 import pickle
-from numpy import array
-from numpy import argmax
+import numpy as np
+import pandas as pd
+from sklearn.utils import shuffle
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
-import numpy as np
-from sklearn.model_selection import train_test_split
-import collections
-import matplotlib.pyplot as plt
-import pandas as pd
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Activation, Flatten
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers.normalization import BatchNormalization
-from keras.layers.advanced_activations import LeakyReLU
-from sklearn.metrics import precision_recall_curve, roc_curve, auc, average_precision_score
 from sklearn.model_selection import StratifiedKFold
-from collections import Counter
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Dense, Activation, Flatten
+from keras.callbacks import EarlyStopping
 
-
-
-
-
-
-
-A = open('TCGA_new_pre_second.pckl', 'rb')
-[dropped_genes_final, dropped_gene_name, dropped_Ens_id, samp_id_new, diag_name_new,
- project_ids_new] = pickle.load(A)
-A.close()
-
-f = open('TCGA_new_pre_first.pckl', 'rb')
-[_, _, _, _, remain_cancer_ids_ind, remain_normal_ids_ind] = pickle.load(f)
-f.close()
 
 batch_size = 128
 epochs = 50
 seed = 7
 np.random.seed(seed)
 
+file = sys.argv[1]
+# out_path = sys.argv[2]
+full_data = pd.read_csv(file, dtype=None, low_memory=False)
+data = full_data.iloc[:, 1:]
+# data_shuffled = pd.DataFrame.to_numpy(shuffle(data.T).T)
 
-X_cancer_samples =dropped_genes_final.iloc[:,remain_cancer_ids_ind].T.values
-X_normal_samples = dropped_genes_final.iloc[:,remain_normal_ids_ind].T.values
-
-name_cancer_samples = project_ids_new[remain_cancer_ids_ind]
-name_normal_samples = ['Normal Samples'] *len(X_normal_samples)
-
-X_cancer_samples_34 = np.concatenate((X_cancer_samples,X_normal_samples))
-X_names = np.concatenate((name_cancer_samples,name_normal_samples))
-X_cancer_samples_mat = np.concatenate((X_cancer_samples_34,np.zeros((len(X_cancer_samples_34),9))),axis=1)
-X_cancer_samples_mat = np.reshape(X_cancer_samples_mat, (-1, 71, 100))
+# values specific for GSE99095
+healthy_cell_cut = 392
 
 
+X_cancer_samples = data.iloc[:-4, :healthy_cell_cut].T.values
+X_normal_samples = data.iloc[:-4, healthy_cell_cut:].T.values
+
+name_cancer_samples = ['Bone Marrow'] * len(X_cancer_samples)
+name_normal_samples = ['Normal Samples'] * len(X_normal_samples)
+
+X_cancer_samples_34 = np.concatenate((X_cancer_samples, X_normal_samples))
+X_names = np.concatenate((name_cancer_samples, name_normal_samples))
+
+# padding by zeros
+X_cancer_samples_mat = np.concatenate((X_cancer_samples_34,np.zeros((len(X_cancer_samples_34),42))),axis=1)
+import pdb; pdb.set_trace()
+X_cancer_samples_mat = np.reshape(X_cancer_samples_mat, (-1, 173, 100))
 
 
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
 cvscores = []
 cv_yscores = []
-Y_test =[]
+Y_test = []
 
 input_Xs = X_cancer_samples_mat
 y_s = X_names
@@ -98,7 +87,7 @@ for train, test in kfold.split(X_cancer_samples_34, y_s):   # input_Xs in normal
                   optimizer='adam',
                   metrics=['categorical_accuracy'])
     callbacks = [EarlyStopping(monitor='categorical_accuracy', patience=3, verbose=0)]
-    if i==0:
+    if i == 0:
         model.summary()
         i = i +1
     history = model.fit(input_Xs[train], onehot_encoded[train],
@@ -116,9 +105,3 @@ for train, test in kfold.split(X_cancer_samples_34, y_s):   # input_Xs in normal
 print("%.2f%% (+/- %.2f%%)" % (np.mean(cvscores), np.std(cvscores)))
 cv_yscores = np.concatenate(cv_yscores)
 Y_test = np.concatenate(Y_test)
-
-
-
-
-
-
