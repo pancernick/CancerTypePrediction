@@ -8,6 +8,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from sklearn.utils import shuffle
+from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import StratifiedKFold
@@ -42,12 +43,12 @@ X_names = np.concatenate((name_cancer_samples, name_normal_samples))
 
 # padding by zeros
 X_cancer_samples_mat = np.concatenate((X_cancer_samples_34,np.zeros((len(X_cancer_samples_34),42))),axis=1)
-import pdb; pdb.set_trace()
 X_cancer_samples_mat = np.reshape(X_cancer_samples_mat, (-1, 173, 100))
 
 
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
 cvscores = []
+
 cv_yscores = []
 Y_test = []
 
@@ -74,12 +75,12 @@ for train, test in kfold.split(X_cancer_samples_34, y_s):   # input_Xs in normal
     num_classes = len(onehot_encoded[0])
 
     model = Sequential()
-    ## *********** First layer Conv
+    # *********** First layer Conv
     model.add(Conv2D(32, kernel_size=(1, 71), strides=(1, 1),
                      input_shape=input_shape))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(1, 2))
-    ## ********* Classification layer
+    # ********* Classification layer
     model.add(Flatten())
     model.add(Dense(128, activation='relu'))
     model.add(Dense(num_classes, activation='softmax'))
@@ -89,7 +90,7 @@ for train, test in kfold.split(X_cancer_samples_34, y_s):   # input_Xs in normal
     callbacks = [EarlyStopping(monitor='categorical_accuracy', patience=3, verbose=0)]
     if i == 0:
         model.summary()
-        i = i +1
+        i = i + 1
     history = model.fit(input_Xs[train], onehot_encoded[train],
                         batch_size=batch_size,
                         epochs=epochs,
@@ -101,7 +102,11 @@ for train, test in kfold.split(X_cancer_samples_34, y_s):   # input_Xs in normal
     cvscores.append(scores[1] * 100)
     Y_test.append(onehot_encoded[test])
     cv_yscores.append(y_score)
-
 print("%.2f%% (+/- %.2f%%)" % (np.mean(cvscores), np.std(cvscores)))
+
 cv_yscores = np.concatenate(cv_yscores)
 Y_test = np.concatenate(Y_test)
+confusion_matrix(
+    np.argmax(Y_test[4], axis=1),
+    np.argmax(cv_yscores[4], axis=1),
+    labels=None, sample_weight=None, normalize=None)
