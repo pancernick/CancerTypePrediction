@@ -4,7 +4,6 @@ This code is written by Milad Mostavi, one of authors of
 Please cite this paper in the case it was useful in your research
 '''
 import sys
-import pickle
 import numpy as np
 import pandas as pd
 from sklearn.utils import shuffle
@@ -15,6 +14,13 @@ from sklearn.model_selection import StratifiedKFold
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Dense, Activation, Flatten
 from keras.callbacks import EarlyStopping
+
+# import tensorflow.compat.v1 as tf
+from vis.visualization import visualize_saliency
+from vis.utils import utils
+from keras import activations
+
+# tf.disable_v2_behavior()
 
 
 batch_size = 128
@@ -106,7 +112,55 @@ print("%.2f%% (+/- %.2f%%)" % (np.mean(cvscores), np.std(cvscores)))
 
 cv_yscores = np.concatenate(cv_yscores)
 Y_test = np.concatenate(Y_test)
-confusion_matrix(
-    np.argmax(Y_test[4], axis=1),
-    np.argmax(cv_yscores[4], axis=1),
-    labels=None, sample_weight=None, normalize=None)
+
+conf_matrix = confusion_matrix(np.argmax(Y_test, axis=1), np.argmax(cv_yscores, axis=1),labels=None, sample_weight=None, normalize=None)
+# CREATE SALIENCY HEATMAP
+
+# Swap softmax with linear
+layer_idx = -1
+model.layers[layer_idx].activation = activations.linear
+model = utils.apply_modifications(model)
+
+# ndices = np.where(Y_test[:, class_bonemarrow] == 1.)[0]
+class_bonemarrow = 0
+class_healthy = 1
+
+heatmap_class_marrow = visualize_saliency(model, layer_idx, seed_input=input_Xs, filter_indices=class_bonemarrow, backprop_modifier='guided', grad_modifier="absolute", keepdims=False)
+heatmap_class_healthy = visualize_saliency(
+    model, layer_idx, seed_input=input_Xs, filter_indices=class_healthy,
+    backprop_modifier='guided', grad_modifier="absolute", keepdims=False)
+
+cancer_heatmap_class_marrow = heatmap_class_marrow.reshape(17300,)[:-42, ]
+cancer_heatmap_class_healthy = heatmap_class_healthy.reshape(17300,)[:-42, ]
+gene_names = full_data.iloc[:-4, 0]
+heatmap_matrix = np.vstack(
+    (gene_names, cancer_heatmap_class_marrow, cancer_heatmap_class_healthy)).T
+
+import matplotlib.ticker as ticker
+
+import matplotlib.cm as cm
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+fig, ax = plt.subplots(1,1, figsize=(12,12))
+heatplot_df = pd.DataFrame.from_records(data=heatmap_matrix, columns=['genes','class_marrow', 'class_healthy']).set_index('genes').astype('float')
+
+heatplot0_df_100 = heatplot_df.sort_values(by=['class_marrow'], ascending=False).iloc[:100,:]
+
+heatplot1_df_100 = heatplot_df.sort_values(by=['class_healthy'], ascending=False).iloc[:100,:]
+
+# heatplot0_df_100 =heatplot_df.loc[heatplot_df['class_marrow'] >= 0.4] - filterd by some saliency values
+heatplot = ax.imshow(heatplot0_df_100, cmap='BuPu')
+ax.set_xticklabels(heatplot0_df_100.columns)
+ax.set_yticklabels(heatplot0_df_100.index)
+# PLOT THE EHATMAP!
+tick_spacing = 1
+ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+ax.set_title("Heatmap of Gene Expression in each class")
+ax.set_xlabel('class')
+ax.set_ylabel('Month')
+
+plt.show()
+print(f"Confusin matrix: TP|FP||FN|TN : {conf_matrix}")
